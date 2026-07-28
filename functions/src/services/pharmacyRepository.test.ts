@@ -6,6 +6,7 @@ import {
   queryNearbyPharmacies,
   createHoldTransaction,
   findActiveHold,
+  expireDueHolds,
   DuplicateHoldError,
   InsufficientStockError,
   InventoryNotFoundError,
@@ -165,5 +166,56 @@ describe("createHoldTransaction", () => {
   it("findActiveHold returns null when there is no active hold", async () => {
     const found = await findActiveHold(HOLD_USER_ID, HOLD_INVENTORY_ID);
     expect(found).toBeNull();
+  });
+});
+
+describe("expireDueHolds", () => {
+  beforeEach(async () => {
+    await clearHolds();
+    await seedHoldInventory(10);
+  });
+
+  afterEach(clearHolds);
+
+  it("restores stock and marks the hold EXPIRED once past expiresAt", async () => {
+    const hold = await createHoldTransaction({
+      userId: HOLD_USER_ID,
+      pharmacyId: HOLD_PHARMACY_ID,
+      inventoryId: HOLD_INVENTORY_ID,
+      quantity: 3,
+    });
+
+    const oneHourLater = new Date(Date.now() + 61 * 60 * 1000);
+    const expiredCount = await expireDueHolds(oneHourLater);
+    expect(expiredCount).toBe(1);
+
+    const invSnap = await db
+      .collection("pharmacies")
+      .doc(HOLD_PHARMACY_ID)
+      .collection("inventory")
+      .doc(HOLD_INVENTORY_ID)
+      .get();
+    expect(invSnap.data()?.stock_quantity).toBe(10);
+
+    const holdSnap = await db.collection("holds").doc(hold.id).get();
+    expect(holdSnap.data()?.status).toBe("EXPIRED");
+
+    const active = await findActiveHold(HOLD_USER_ID, HOLD_INVENTORY_ID);
+    expect(active).toBeNull();
+  });
+
+  it("does not touch holds that haven't expired yet", async () => {
+    await createHoldTransaction({
+      userId: HOLD_USER_ID,
+      pharmacyId: HOLD_PHARMACY_ID,
+      inventoryId: HOLD_INVENTORY_ID,
+      quantity: 3,
+    });
+
+    const expiredCount = await expireDueHolds(new Date());
+    expect(expiredCount).toBe(0);
+
+    const active = await findActiveHold(HOLD_USER_ID, HOLD_INVENTORY_ID);
+    expect(active).not.toBeNull();
   });
 });

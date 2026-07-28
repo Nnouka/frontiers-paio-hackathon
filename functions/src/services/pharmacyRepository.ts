@@ -1,5 +1,6 @@
 import { db } from "../admin";
 import { geohashQueryBounds, distanceBetween } from "geofire-common";
+import * as logger from "firebase-functions/logger";
 
 export interface InventoryItemDoc {
   id: string;
@@ -164,4 +165,47 @@ export async function createHoldTransaction(params: CreateHoldParams): Promise<H
 
     return { id: holdRef.id, ...holdDoc };
   });
+}
+
+export async function expireDueHolds(now: Date = new Date()): Promise<number> {
+  const nowIso = now.toISOString();
+  const snap = await db
+    .collection("holds")
+    .where("status", "==", "ACTIVE")
+    .where("expiresAt", "<=", nowIso)
+    .get();
+
+  let expiredCount = 0;
+
+  for (const holdDoc of snap.docs) {
+    try {
+      await db.runTransaction(async (tx) => {
+        const holdSnap = await tx.get(holdDoc.ref);
+        const holdData = holdSnap.data();
+        if (!holdData || holdData.status !== "ACTIVE") return;
+
+        const inventoryRef = db
+          .collection("pharmacies")
+          .doc(holdData.pharmacyId)
+          .collection("inventory")
+          .doc(holdData.inventoryId);
+        const invSnap = await tx.get(inventoryRef);
+
+        if (invSnap.exists) {
+          const invData = invSnap.data()!;
+          tx.update(inventoryRef, {
+            stock_quantity: invData.stock_quantity + holdData.quantity,
+            last_updated: new Date().toISOString(),
+          });
+        }
+
+        tx.update(holdDoc.ref, { status: "EXPIRED" });
+      });
+      expiredCount += 1;
+    } catch (err) {
+      logger.error("Failed to expire hold", { holdId: holdDoc.id, err });
+    }
+  }
+
+  return expiredCount;
 }
