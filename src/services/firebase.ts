@@ -1,6 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getAuth, connectAuthEmulator, signInAnonymously } from "firebase/auth";
+import {
+  getFirestore,
+  connectFirestoreEmulator,
+  enableIndexedDbPersistence,
+} from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 
@@ -45,3 +49,16 @@ export function initEmulators() {
 }
 
 initEmulators();
+
+// Keep last plan/reminder data available in browser offline mode.
+enableIndexedDbPersistence(db).catch((err) => {
+  // failed-precondition occurs when multiple tabs are open; offline is still optional.
+  console.warn("[Firebase] IndexedDB persistence unavailable:", err);
+});
+
+// Demo bootstrap: sign users in anonymously if no active auth session.
+if (!auth.currentUser) {
+  signInAnonymously(auth).catch((err) => {
+    console.warn("[Firebase] Anonymous sign-in unavailable:", err);
+  });
+}

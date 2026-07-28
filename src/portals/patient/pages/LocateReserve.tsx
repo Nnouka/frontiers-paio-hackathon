@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -6,43 +6,130 @@ import {
   Clock, 
   Filter, 
   CheckCircle2, 
-  Building2, 
   ShieldCheck,
   ChevronRight,
-  Sparkles
+  LocateFixed,
+  Navigation,
+  Loader2
 } from 'lucide-react';
+import { GoogleMap, InfoWindowF, MarkerF, useJsApiLoader } from '@react-google-maps/api';
+import { apiCreateHold, apiSearchPharmacies } from '../../../services/apiClient';
 import { usePharmaLoopStore, store } from '../../../services/store';
 import { StatusBadge } from '../../../components/shared/StatusBadge';
+import type { GeoLocation, PharmacySearchResult } from '@shared/types/contracts';
+
+const DEMO_FALLBACK_COORDS: GeoLocation = { latitude: -1.9441, longitude: 30.0619 };
+
+function getCurrentPosition(): Promise<GeoLocation> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(DEMO_FALLBACK_COORDS);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      () => resolve(DEMO_FALLBACK_COORDS),
+      { timeout: 8000, enableHighAccuracy: true }
+    );
+  });
+}
+
+function estimateRouteMinutes(distanceKm: number): number {
+  const averageUrbanSpeedKmH = 25;
+  return Math.max(2, Math.round((distanceKm / averageUrbanSpeedKmH) * 60));
+}
 
 export const LocateReserve: React.FC = () => {
   const navigate = useNavigate();
-  const { pharmacies, holds } = usePharmaLoopStore();
+  const { holds } = usePharmaLoopStore();
   const [searchQuery, setSearchQuery] = useState('Amoxicillin');
   const [radiusKm, setRadiusKm] = useState(10);
   const [filterInStockOnly, setFilterInStockOnly] = useState(true);
+  const [searchResults, setSearchResults] = useState<PharmacySearchResult[]>([]);
+  const [searchCenter, setSearchCenter] = useState<GeoLocation>(DEMO_FALLBACK_COORDS);
+  const [activeMarkerId, setActiveMarkerId] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isCreatingHold, setIsCreatingHold] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+  const { isLoaded: isMapLoaded } = useJsApiLoader({
+    id: 'frontiers-maps-script',
+    googleMapsApiKey: mapsApiKey
+  });
 
   const activeHold = holds.find(h => h.status === 'ACTIVE');
 
-  // Filter inventory across pharmacies
-  const filteredResults = pharmacies.map(pharm => {
-    const matchingItems = (pharm.inventory || []).filter(item => {
-      const matchesName = item.medication_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.generic_name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStock = filterInStockOnly ? item.stock_status !== 'OUT_OF_STOCK' : true;
-      return matchesName && matchesStock;
-    });
+  const runSearch = useCallback(async () => {
+    setIsSearching(true);
+    setErrorMessage(null);
 
-    return {
-      ...pharm,
-      matchingInventory: matchingItems,
-      distanceKm: (Math.random() * 2 + 0.5).toFixed(1) // Simulated distance
-    };
-  }).filter(p => p.matchingInventory.length > 0);
+    try {
+      const position = await getCurrentPosition();
+      setSearchCenter(position);
 
-  const handleHoldClick = (pharmacyId: string, inventoryId: string, medName: string) => {
-    const hold = store.createHold(pharmacyId, inventoryId, medName, 1, "Amina Mugisha");
-    alert(`✅ 60-Minute Reservation Locked!\n\nHold ID: #${hold.holdId}\nMedication: ${medName}\nPharmacy: Central Care Pharmacy\nExpires At: ${new Date(hold.expiresAt).toLocaleTimeString()}`);
-    navigate(`/patient/pharmacy/${pharmacyId}`);
+      const response = await apiSearchPharmacies({
+        query: searchQuery,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        radiusKm
+      });
+
+      setSearchResults(response.pharmacies);
+      setActiveMarkerId(response.pharmacies[0]?.id ?? null);
+    } catch (err) {
+      console.error('[LocateReserve] Search error:', err);
+      setErrorMessage('Unable to fetch live pharmacy results. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [radiusKm, searchQuery]);
+
+  useEffect(() => {
+    void runSearch();
+  }, [runSearch]);
+
+  const filteredResults = useMemo(() => {
+    return searchResults
+      .map((pharm) => {
+        const matchingItems = (pharm.matchingInventory || []).filter((item) => {
+          const matchesStock = filterInStockOnly ? item.stock_status !== 'OUT_OF_STOCK' : true;
+          return matchesStock;
+        });
+
+        return {
+          ...pharm,
+          matchingInventory: matchingItems
+        };
+      })
+      .filter((p) => p.matchingInventory.length > 0);
+  }, [filterInStockOnly, searchResults]);
+
+  const handleHoldClick = async (pharmacyId: string, inventoryId: string, medName: string) => {
+    setIsCreatingHold(inventoryId);
+    setErrorMessage(null);
+    try {
+      const response = await apiCreateHold({
+        pharmacyId,
+        inventoryId,
+        quantity: 1,
+        patientName: 'Amina Mugisha'
+      });
+
+      const hold = response.hold;
+      store.createHold(pharmacyId, inventoryId, medName, 1, 'Amina Mugisha');
+
+      alert(
+        `✅ 60-Minute Reservation Locked!\n\nHold ID: #${hold.holdId}\nMedication: ${medName}\nExpires At: ${new Date(hold.expiresAt).toLocaleTimeString()}`
+      );
+      navigate(`/patient/pharmacy/${pharmacyId}`);
+    } catch (err) {
+      console.error('[LocateReserve] Hold creation error:', err);
+      setErrorMessage('Could not place hold right now. Please retry.');
+    } finally {
+      setIsCreatingHold(null);
+    }
   };
 
   return (
@@ -89,8 +176,17 @@ export const LocateReserve: React.FC = () => {
           </div>
 
           <button
+            onClick={() => void runSearch()}
+            disabled={isSearching}
+            className="px-4 py-3 rounded-xl text-xs font-semibold border bg-[#00685f] text-white border-[#00685f] hover:bg-[#005049] disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+          >
+            {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <LocateFixed className="w-4 h-4" />}
+            <span>{isSearching ? 'Searching...' : 'Search Nearby'}</span>
+          </button>
+
+          <button
             onClick={() => setFilterInStockOnly(!filterInStockOnly)}
-            className={`px-4 py-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-2 ${
+            className={`px-4 py-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-2 md:col-span-4 ${
               filterInStockOnly 
                 ? 'bg-teal-50 border-teal-300 text-[#00685f]' 
                 : 'bg-slate-50 border-slate-300 text-slate-700'
@@ -100,6 +196,59 @@ export const LocateReserve: React.FC = () => {
             <span>In-Stock Only</span>
           </button>
         </div>
+
+        {errorMessage && (
+          <div className="mt-3 bg-rose-50 text-rose-800 border border-rose-200 rounded-xl px-3 py-2 text-xs font-medium">
+            {errorMessage}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <span>Interactive Map</span>
+          <span>Center: {searchCenter.latitude.toFixed(3)}, {searchCenter.longitude.toFixed(3)}</span>
+        </div>
+
+        {!mapsApiKey && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-900">
+            Add VITE_GOOGLE_MAPS_API_KEY in .env to render the live map.
+          </div>
+        )}
+
+        {mapsApiKey && isMapLoaded && (
+          <GoogleMap
+            mapContainerStyle={{ width: '100%', height: '320px', borderRadius: '12px' }}
+            center={{ lat: searchCenter.latitude, lng: searchCenter.longitude }}
+            zoom={12}
+            options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
+          >
+            {filteredResults.map((pharm) => (
+              <MarkerF
+                key={pharm.id}
+                position={{ lat: pharm.location.latitude, lng: pharm.location.longitude }}
+                onClick={() => setActiveMarkerId(pharm.id)}
+              />
+            ))}
+
+            {activeMarkerId && (() => {
+              const current = filteredResults.find((p) => p.id === activeMarkerId);
+              if (!current) return null;
+              return (
+                <InfoWindowF
+                  position={{ lat: current.location.latitude, lng: current.location.longitude }}
+                  onCloseClick={() => setActiveMarkerId(null)}
+                >
+                  <div className="min-w-[170px] text-xs text-slate-800">
+                    <div className="font-bold text-slate-900">{current.name}</div>
+                    <div className="text-slate-600">{current.distanceKm.toFixed(1)} km • ~{estimateRouteMinutes(current.distanceKm)} min</div>
+                    <div className="text-slate-600">{current.matchingInventory[0]?.medication_name || 'Medication result'}</div>
+                  </div>
+                </InfoWindowF>
+              );
+            })()}
+          </GoogleMap>
+        )}
       </div>
 
       {/* Active Hold Notification if present */}
@@ -125,6 +274,12 @@ export const LocateReserve: React.FC = () => {
           <span>Updated Real-Time via Inventory Webhooks</span>
         </div>
 
+        {!isSearching && filteredResults.length === 0 && (
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 text-sm text-slate-500">
+            No matching inventory in the current radius. Increase radius or adjust medication name.
+          </div>
+        )}
+
         {filteredResults.map((pharm) => (
           <div key={pharm.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs hover:border-slate-300 transition-all space-y-4">
             {/* Pharmacy Header */}
@@ -138,8 +293,9 @@ export const LocateReserve: React.FC = () => {
                 </div>
                 <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  {pharm.address} • <span className="font-semibold text-slate-700">{pharm.distanceKm} km away</span>
+                  {pharm.address} • <span className="font-semibold text-slate-700">{pharm.distanceKm.toFixed(1)} km away</span>
                 </p>
+                <p className="text-xs text-slate-500 mt-0.5">Approx route time: {estimateRouteMinutes(pharm.distanceKm)} min</p>
               </div>
 
               <div className="text-right">
@@ -173,19 +329,29 @@ export const LocateReserve: React.FC = () => {
 
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button
-                      onClick={() => handleHoldClick(pharm.id, item.id, item.medication_name)}
-                      disabled={item.stock_status === 'OUT_OF_STOCK'}
+                      onClick={() => void handleHoldClick(pharm.id, item.id, item.medication_name)}
+                      disabled={item.stock_status === 'OUT_OF_STOCK' || isCreatingHold === item.id}
                       className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-xs ${
-                        item.stock_status === 'OUT_OF_STOCK'
+                        item.stock_status === 'OUT_OF_STOCK' || isCreatingHold === item.id
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : 'bg-[#00685f] hover:bg-[#005049] text-white'
                       }`}
                     >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Reserve 60-Min Hold</span>
+                      {isCreatingHold === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+                      <span>{isCreatingHold === item.id ? 'Placing hold...' : 'Reserve 60-Min Hold'}</span>
                     </button>
 
-                    <button 
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${pharm.location.latitude},${pharm.location.longitude}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2.5 bg-white border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 transition-all shrink-0"
+                      title="Open directions"
+                    >
+                      <Navigation className="w-4 h-4" />
+                    </a>
+
+                    <button
                       onClick={() => navigate(`/patient/pharmacy/${pharm.id}`)}
                       className="p-2.5 bg-white border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-100 transition-all shrink-0"
                     >

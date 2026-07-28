@@ -1,8 +1,10 @@
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
+const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || "pharmaloop-224f3";
+
 if (getApps().length === 0) {
-  initializeApp({ projectId: "frontiers-paio-dev" });
+  initializeApp({ projectId });
 }
 const auth = getAuth();
 
@@ -18,6 +20,7 @@ const SEED_PHARMACY_USERS: SeedPharmacyUser[] = [
 ];
 
 async function seedUsers() {
+  console.log(`Seeding pharmacy users into project: ${projectId}`);
   for (const seedUser of SEED_PHARMACY_USERS) {
     let user;
     try {
