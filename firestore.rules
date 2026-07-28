@@ -15,14 +15,18 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.role == role;
     }
 
+    function ownsPharmacy(pharmacyId) {
+      return hasRole('pharmacy') && request.auth.token.pharmacyId == pharmacyId;
+    }
+
     // Public / Geo search: anyone authenticated or guest can read pharmacies & inventory
     match /pharmacies/{pharmacyId} {
       allow read: if true;
-      allow write: if hasRole('pharmacy') || hasRole('admin');
+      allow write: if ownsPharmacy(pharmacyId) || hasRole('admin');
 
       match /inventory/{inventoryId} {
         allow read: if true;
-        allow write: if hasRole('pharmacy') || hasRole('admin');
+        allow write: if ownsPharmacy(pharmacyId) || hasRole('admin');
       }
     }
 
