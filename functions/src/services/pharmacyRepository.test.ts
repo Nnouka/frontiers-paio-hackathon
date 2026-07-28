@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { db } from "../admin";
 import { GeoPoint } from "firebase-admin/firestore";
 import { geohashForLocation } from "geofire-common";
-import { queryNearbyPharmacies } from "./pharmacyRepository";
+import {
+  queryNearbyPharmacies,
+  createHoldTransaction,
+  findActiveHold,
+  DuplicateHoldError,
+  InsufficientStockError,
+  InventoryNotFoundError,
+} from "./pharmacyRepository";
 
 const NEAR_ID = "test-pharm-near";
 const FAR_ID = "test-pharm-far";
@@ -64,5 +71,99 @@ describe("queryNearbyPharmacies", () => {
 
     const results = await queryNearbyPharmacies(CENTER[0], CENTER[1], 5, "Amoxicillin");
     expect(results.map((r) => r.id)).not.toContain(NEAR_ID);
+  });
+});
+
+const HOLD_PHARMACY_ID = "test-pharm-hold";
+const HOLD_INVENTORY_ID = "test-inv-hold";
+const HOLD_USER_ID = "test-user-hold";
+
+async function seedHoldInventory(stockQuantity: number) {
+  await db.collection("pharmacies").doc(HOLD_PHARMACY_ID).collection("inventory").doc(HOLD_INVENTORY_ID).set({
+    medication_name: "Test Med 500mg",
+    generic_name: "Test Med",
+    unit_price: 10,
+    stock_quantity: stockQuantity,
+    stock_status: "IN_STOCK",
+    last_updated: new Date().toISOString(),
+  });
+}
+
+async function clearHolds() {
+  const holds = await db.collection("holds").where("pharmacyId", "==", HOLD_PHARMACY_ID).get();
+  await Promise.all(holds.docs.map((d) => d.ref.delete()));
+  await db.collection("pharmacies").doc(HOLD_PHARMACY_ID).collection("inventory").doc(HOLD_INVENTORY_ID).delete();
+}
+
+describe("createHoldTransaction", () => {
+  beforeEach(async () => {
+    await clearHolds();
+    await seedHoldInventory(10);
+  });
+
+  afterEach(clearHolds);
+
+  it("creates a hold and decrements stock", async () => {
+    const hold = await createHoldTransaction({
+      userId: HOLD_USER_ID,
+      pharmacyId: HOLD_PHARMACY_ID,
+      inventoryId: HOLD_INVENTORY_ID,
+      quantity: 2,
+    });
+
+    expect(hold.status).toBe("ACTIVE");
+
+    const invSnap = await db
+      .collection("pharmacies")
+      .doc(HOLD_PHARMACY_ID)
+      .collection("inventory")
+      .doc(HOLD_INVENTORY_ID)
+      .get();
+    expect(invSnap.data()?.stock_quantity).toBe(8);
+  });
+
+  it("rejects a duplicate active hold for the same user+item", async () => {
+    await createHoldTransaction({
+      userId: HOLD_USER_ID,
+      pharmacyId: HOLD_PHARMACY_ID,
+      inventoryId: HOLD_INVENTORY_ID,
+      quantity: 1,
+    });
+
+    await expect(
+      createHoldTransaction({
+        userId: HOLD_USER_ID,
+        pharmacyId: HOLD_PHARMACY_ID,
+        inventoryId: HOLD_INVENTORY_ID,
+        quantity: 1,
+      })
+    ).rejects.toBeInstanceOf(DuplicateHoldError);
+  });
+
+  it("rejects a hold when requested quantity exceeds stock", async () => {
+    await expect(
+      createHoldTransaction({
+        userId: HOLD_USER_ID,
+        pharmacyId: HOLD_PHARMACY_ID,
+        inventoryId: HOLD_INVENTORY_ID,
+        quantity: 999,
+      })
+    ).rejects.toBeInstanceOf(InsufficientStockError);
+  });
+
+  it("rejects a hold on a nonexistent inventory item", async () => {
+    await expect(
+      createHoldTransaction({
+        userId: HOLD_USER_ID,
+        pharmacyId: HOLD_PHARMACY_ID,
+        inventoryId: "missing-inv",
+        quantity: 1,
+      })
+    ).rejects.toBeInstanceOf(InventoryNotFoundError);
+  });
+
+  it("findActiveHold returns null when there is no active hold", async () => {
+    const found = await findActiveHold(HOLD_USER_ID, HOLD_INVENTORY_ID);
+    expect(found).toBeNull();
   });
 });

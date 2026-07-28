@@ -86,3 +86,82 @@ export async function queryNearbyPharmacies(
 
   return results.sort((a, b) => a.distanceKm - b.distanceKm);
 }
+
+export interface HoldDoc {
+  id: string;
+  userId: string;
+  pharmacyId: string;
+  inventoryId: string;
+  medicationName: string;
+  quantity: number;
+  status: "ACTIVE" | "EXPIRED" | "FULFILLED";
+  createdAt: string;
+  expiresAt: string;
+}
+
+export class DuplicateHoldError extends Error {}
+export class InsufficientStockError extends Error {}
+export class InventoryNotFoundError extends Error {}
+
+export interface CreateHoldParams {
+  userId: string;
+  pharmacyId: string;
+  inventoryId: string;
+  quantity: number;
+}
+
+export async function findActiveHold(userId: string, inventoryId: string): Promise<HoldDoc | null> {
+  const snap = await db
+    .collection("holds")
+    .where("userId", "==", userId)
+    .where("inventoryId", "==", inventoryId)
+    .where("status", "==", "ACTIVE")
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return { id: doc.id, ...doc.data() } as HoldDoc;
+}
+
+export async function createHoldTransaction(params: CreateHoldParams): Promise<HoldDoc> {
+  const { userId, pharmacyId, inventoryId, quantity } = params;
+
+  const existing = await findActiveHold(userId, inventoryId);
+  if (existing) {
+    throw new DuplicateHoldError(`User ${userId} already has an active hold on ${inventoryId}`);
+  }
+
+  const inventoryRef = db.collection("pharmacies").doc(pharmacyId).collection("inventory").doc(inventoryId);
+  const holdRef = db.collection("holds").doc();
+  const nowIso = new Date().toISOString();
+  const expiresAtIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  return db.runTransaction(async (tx) => {
+    const invSnap = await tx.get(inventoryRef);
+    if (!invSnap.exists) {
+      throw new InventoryNotFoundError(`Inventory ${inventoryId} not found at pharmacy ${pharmacyId}`);
+    }
+
+    const invData = invSnap.data()!;
+    if (invData.stock_quantity < quantity) {
+      throw new InsufficientStockError(`Only ${invData.stock_quantity} units available`);
+    }
+
+    tx.update(inventoryRef, { stock_quantity: invData.stock_quantity - quantity, last_updated: nowIso });
+
+    const holdDoc: Omit<HoldDoc, "id"> = {
+      userId,
+      pharmacyId,
+      inventoryId,
+      medicationName: invData.medication_name,
+      quantity,
+      status: "ACTIVE",
+      createdAt: nowIso,
+      expiresAt: expiresAtIso,
+    };
+    tx.set(holdRef, holdDoc);
+
+    return { id: holdRef.id, ...holdDoc };
+  });
+}
