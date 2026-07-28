@@ -102,7 +102,8 @@ export async function apiCreateHold(req: CreateHoldRequest): Promise<CreateHoldR
       medicationName: "Amoxicillin 500mg",
       quantity: req.quantity,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      status: "ACTIVE"
+      status: "ACTIVE",
+      createdAt: new Date().toISOString()
     }
   }));
 }
