@@ -4,12 +4,12 @@ Epics are grouped by the five parallel workstreams defined in [architecture.md](
 section 6, so each teammate can build independently and we consolidate against agreed API
 contracts at the end. System behavior detail is in [system.md](system.md).
 
-## [ ] Epic 0: Foundation and integration setup (shared, all owners)
+## [x] Epic 0: Foundation and integration setup (shared, all owners)
 
-- [ ] As a team, we agree on Cloud Functions callable contracts for `searchPharmacies`, `createHold`, `extractFromScan`, `checkDDI`, `createSchedule`, `logMedication`, `logAdherence`, `getAdherenceAnalytics` before parallel work starts.
-- [ ] As a developer, I can bootstrap my workstream's service and run it against a shared Firebase project (dev environment) using the Firebase Emulator Suite.
-- [ ] As a developer, I can run local emulators/mocks for the services I depend on but don't own, so I can build without blocking on other workstreams.
-- [ ] As a maintainer, I can deploy Firebase Hosting preview channels per pull request so integration checkpoints are fast and safe.
+- [x] As a team, we agree on Cloud Functions callable contracts for `searchPharmacies`, `createHold`, `extractFromScan`, `checkDDI`, `createSchedule`, `logMedication`, `logAdherence`, `getAdherenceAnalytics` before parallel work starts.
+- [x] As a developer, I can bootstrap my workstream's service and run it against a shared Firebase project (dev environment) using the Firebase Emulator Suite.
+- [x] As a developer, I can run local emulators/mocks for the services I depend on but don't own, so I can build without blocking on other workstreams.
+- [x] As a maintainer, I can deploy Firebase Hosting preview channels per pull request so integration checkpoints are fast and safe.
 
 ## [ ] Epic 1: Web Frontend App (Workstream 1)
 

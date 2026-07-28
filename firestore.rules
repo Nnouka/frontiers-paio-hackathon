@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    // Public / Geo search: anyone authenticated or guest can read pharmacies & inventory
+    match /pharmacies/{pharmacyId} {
+      allow read: if true;
+      allow write: if hasRole('pharmacy') || hasRole('admin');
+
+      match /inventory/{inventoryId} {
+        allow read: if true;
+        allow write: if hasRole('pharmacy') || hasRole('admin');
+      }
+    }
+
+    // Patient User Data (medications, adherence logs, holds)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || hasRole('clinician') || hasRole('admin');
+
+      match /medications/{medicationId} {
+        allow read, write: if isOwner(userId) || hasRole('clinician') || hasRole('admin');
+
+        match /adherence_logs/{logId} {
+          allow read, write: if isOwner(userId) || hasRole('clinician') || hasRole('admin');
+        }
+      }
+
+      match /holds/{holdId} {
+        allow read, write: if isOwner(userId) || hasRole('pharmacy') || hasRole('admin');
+      }
+    }
+
+    // Holds collection top-level access
+    match /holds/{holdId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+  }
+}
