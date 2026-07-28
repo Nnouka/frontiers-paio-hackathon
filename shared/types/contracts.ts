@@ -1,6 +1,6 @@
 /**
  * Shared API Contracts & Domain Entities
- * Frontiers PAIO - Health Track Ecosystem
+ * Frontiers PAIO - Health Track Ecosystem (PharmaLoop)
  */
 
 // --- Domain Data Models ---
@@ -21,6 +21,8 @@ export interface InventoryItem {
   stock_quantity: number;
   stock_status: StockStatus;
   last_updated: string;
+  dosage?: string;
+  category?: string;
 }
 
 export interface Pharmacy {
@@ -31,6 +33,9 @@ export interface Pharmacy {
   geohash: string;
   phone: string;
   is_active: boolean;
+  license_number?: string;
+  verification_status?: 'VERIFIED' | 'PENDING' | 'REJECTED';
+  rating?: number;
   inventory?: InventoryItem[];
 }
 
@@ -47,6 +52,9 @@ export interface MedicationHold {
   quantity: number;
   expiresAt: string;
   status: 'ACTIVE' | 'EXPIRED' | 'FULFILLED' | 'CANCELLED';
+  patientName?: string;
+  patientPhone?: string;
+  createdAt: string;
 }
 
 export interface ExtractedPrescriptionEntity {
@@ -59,17 +67,20 @@ export interface ExtractedPrescriptionEntity {
   total_quantity: number;
   warnings: string[];
   rawTextConfidence?: number;
+  scanned_image_url?: string;
 }
 
 export type InteractionSeverity = 'SEVERE' | 'MODERATE' | 'DIETARY';
 
 export interface DrugInteraction {
+  id?: string;
   existingDrugName: string;
   newDrugName: string;
   severity: InteractionSeverity;
   description: string;
   recommendation: string;
   requiresConfirmation: boolean;
+  mechanism?: string;
 }
 
 export interface ScheduledDose {
@@ -115,9 +126,51 @@ export interface AdherenceAnalytics {
   pdfReportUrl?: string;
 }
 
+// Clinician Case Detail & Review Queue
+export interface ClinicianCase {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientAge: number;
+  patientGender: string;
+  prescribedDrug: string;
+  existingRegimen: string[];
+  severity: InteractionSeverity;
+  interactionSummary: string;
+  status: 'PENDING' | 'APPROVED' | 'MODIFIED' | 'REJECTED';
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewerNotes?: string;
+  assignedClinician?: string;
+  extractedEntity?: ExtractedPrescriptionEntity;
+  ddiDetails?: DrugInteraction;
+}
+
+// System Admin Data
+export type UserRole = 'PATIENT' | 'PHARMACY' | 'CLINICIAN' | 'ADMIN';
+
+export interface SystemUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: 'ACTIVE' | 'PENDING' | 'SUSPENDED';
+  createdAt: string;
+  lastLogin?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  actor: string;
+  actorRole: UserRole;
+  action: string;
+  details: string;
+  ipAddress?: string;
+}
+
 // --- Cloud Functions Callable Contracts ---
 
-// Workstream 2: Geo-Spatial Engine & Pharmacy Portal
 export interface SearchPharmaciesRequest {
   query?: string;
   latitude: number;
@@ -136,13 +189,14 @@ export interface CreateHoldRequest {
   pharmacyId: string;
   inventoryId: string;
   quantity: number;
+  patientName?: string;
+  patientPhone?: string;
 }
 
 export interface CreateHoldResponse {
   hold: MedicationHold;
 }
 
-// Workstream 3: AI Vision/OCR & Drug Safety Engine
 export interface ExtractFromScanRequest {
   imageBase64?: string;
   storagePath?: string;
@@ -166,12 +220,11 @@ export interface CheckDDIResponse {
   overallRiskLevel: 'NONE' | 'LOW' | 'MODERATE' | 'SEVERE';
 }
 
-// Workstream 4: Schedule & Alert Service
 export interface LifestyleAnchors {
-  breakfast?: string; // e.g. "08:00"
-  lunch?: string;     // e.g. "13:00"
-  dinner?: string;    // e.g. "20:00"
-  bedtime?: string;   // e.g. "22:00"
+  breakfast?: string;
+  lunch?: string;
+  dinner?: string;
+  bedtime?: string;
 }
 
 export interface CreateScheduleRequest {
@@ -188,7 +241,6 @@ export interface CreateScheduleResponse {
   createdTasksCount: number;
 }
 
-// Workstream 5: Data, Auth & Analytics
 export interface LogMedicationRequest {
   medication_name: string;
   generic_name?: string;
