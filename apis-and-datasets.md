@@ -32,9 +32,9 @@ This document lists practical APIs and datasets for a 12-hour health-track MVP a
 - What it is: Auth, Firestore, Storage, Cloud Functions, and app security controls.
 - How it helps: Fast end-to-end delivery in hackathon time with low ops burden and clear role-based user flows.
 
-### 8. Firebase Cloud Messaging (FCM)
-- What it is: Push notification service for Android and iOS apps.
-- How it helps: Powers personalized reminder delivery, missed-dose recovery prompts, and caregiver escalation notifications.
+### 8. Firebase Cloud Messaging (FCM) for Web
+- What it is: Web Push notification service for browser-based apps (Android, iOS, and desktop browsers).
+- How it helps: Powers personalized reminder delivery, missed-dose recovery prompts, and caregiver escalation notifications without a native app install.
 
 ## 2) Recommended datasets and data sources
 
@@ -86,7 +86,7 @@ This document lists practical APIs and datasets for a 12-hour health-track MVP a
 ## 5) Fast implementation order
 
 ### Hour 1-2
-- Setup Firebase project, auth, base Flutter app, and Cloud Functions scaffold.
+- Setup Firebase project, auth, base React + TypeScript (Vite) mobile-first web app, and Cloud Functions scaffold.
 
 ### Hour 3-5
 - Build upload flow, Gemini explanation endpoint, and medication-plan extraction.

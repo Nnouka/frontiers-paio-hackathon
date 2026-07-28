@@ -3,7 +3,7 @@
 **Document Version:** 2.0.0
 **Date:** July 2026
 **Project Name:** Integrated Digital Health & Adherence Ecosystem
-**Target Platform:** Cross-Platform Mobile Application (iOS/Android) & Web Platform
+**Target Platform:** Mobile-First Responsive Web Application (React + TypeScript)
 **Stack Constraint:** Google/Firebase services only (hackathon speed + prototyping fit)
 
 ---
@@ -14,14 +14,14 @@ The **Integrated Digital Health & Adherence Ecosystem** is an end-to-end AI plat
 1. **The Acquisition Gap:** The difficulty patients face in locating specific prescribed medications in real-time within nearby retail pharmacies.
 2. **The Adherence Gap:** The high rate of non-adherence, improper dosage, and missed refills post-purchase.
 
-By seamlessly bridging real-time geo-spatial inventory matching with an intelligent computer-vision prescription parser and automated adherence tracking, this system forms a closed-loop healthcare companion for patients and healthcare providers, built entirely on Google's Firebase and Google Cloud platform for fast, low-ops hackathon delivery.
+By seamlessly bridging real-time geo-spatial inventory matching with an intelligent computer-vision prescription parser and automated adherence tracking, this system forms a closed-loop healthcare companion for patients and healthcare providers, delivered as a mobile-first responsive React + TypeScript web app, built entirely on Google's Firebase and Google Cloud platform for fast, low-ops hackathon delivery.
 
 ---
 
 ## 1. System Ecosystem Overview
 
                               +---------------------------------------+
-                              |    PATIENT MOBILE APP (Flutter)       |
+                              |  PATIENT WEB APP (React + TypeScript) |
                               +-------------------+-------------------+
                                                   |
                                                   | Firebase SDKs / Callable Functions (HTTPS)
@@ -48,9 +48,9 @@ By seamlessly bridging real-time geo-spatial inventory matching with an intellig
 |                                     |
 v                                     v
 +-------------------------------+     +-------------------------------+
-|   PHARMACY PORTAL (Firebase   |     |   DATA & ANALYTICS STORAGE    |
-|   Hosting + Cloud Functions)  |     | (Firestore, Cloud Storage,    |
-|                                 |     |  BigQuery export)             |
+|   PHARMACY PORTAL (React +    |     |   DATA & ANALYTICS STORAGE    |
+|   TypeScript, Firebase        |     | (Firestore, Cloud Storage,    |
+|   Hosting + Cloud Functions)  |     |  BigQuery export)             |
 +-------------------------------+     +-------------------------------+
 
 
@@ -62,14 +62,14 @@ v                                     v
 
 1. **Patient Query Input:**
    * The user inputs a required medication name, active ingredient, or uploads a photo of a doctor's prescription slip.
-   * GPS location coordinates are captured via the Flutter app with user authorization.
+   * GPS location coordinates are captured via the browser Geolocation API with user authorization.
 
 2. **Geo-Fencing & Inventory Querying:**
-   * The backend queries Cloud Firestore inventory documents using geohash range queries (via the `geoflutterfire2` / `geofire-common` libraries) over a bounding radius (e.g., 5km, 10km, 25km).
+   * The backend queries Cloud Firestore inventory documents using geohash range queries (via the `geofire-common` library) over a bounding radius (e.g., 5km, 10km, 25km).
    * The inventory query matches exact stock keeping units (SKUs), active chemical components, and generic alternatives available at participating pharmacies within the selected radius.
 
 3. **Interactive Map & Decision Support:**
-   * Results are rendered on an interactive map (Google Maps Platform / `google_maps_flutter`) showing:
+   * Results are rendered on an interactive map (Google Maps Platform via `@react-google-maps/api`) showing:
      * Distance and route navigation time (Directions API).
      * Price points per pharmacy.
      * Operating hours and contact details.
@@ -83,7 +83,7 @@ v                                     v
 ### Phase 2: Purchase Onboarding & AI Optical Recognition (OCR)
 
 1. **Medication Capture:**
-   * Following purchase, the patient scans the pill box, bottle label, or official receipt using the device camera.
+   * Following purchase, the patient captures the pill box, bottle label, or official receipt using the device camera via the browser's `getUserMedia`/file-input capture API (works on mobile and desktop browsers, no native app install required).
 
 2. **Multimodal AI Vision Extraction Pipeline:**
    * The image is uploaded to Cloud Storage for Firebase, then processed by a Cloud Function that calls the **Vertex AI Gemini API** (multimodal) for OCR and entity extraction.
@@ -137,18 +137,18 @@ v                                     v
 
 | Layer | Technical Components | Key Functions |
 | :--- | :--- | :--- |
-| **Frontend / Mobile** | Flutter (Dart) | Cross-platform mobile development, offline-first caching (Firestore offline persistence), camera integration, native background alerts. |
-| **Pharmacy Portal (Web)** | Flutter Web or Firebase Hosting + Flutter Web | Pharmacy-side inventory management UI. |
+| **Frontend / Web App** | React + TypeScript (Vite), mobile-first responsive design | Single responsive web app (patient + pharmacy portal), offline-first caching (Firestore offline persistence), browser camera capture, Web Push background alerts. No native app install required. |
+| **Pharmacy Portal** | Same React + TypeScript codebase, role-gated routes | Pharmacy-side inventory management UI, served from the same web app via Firebase Hosting. |
 | **Backend / API** | Firebase Cloud Functions (Node.js/TypeScript, 2nd gen) | Callable/HTTPS functions, Firestore/Storage triggers, user authentication guard, business logic. |
 | **AI / Machine Learning Engine** | Vertex AI Gemini API (multimodal) | Vision OCR entity extraction, drug-drug interaction reasoning, natural language schedule parsing. |
 | **Database Layer** | Cloud Firestore | Document storage for users, pharmacies, inventory (with geohash field), prescriptions, medications, adherence logs. |
 | **Geospatial Indexing** | Firestore + geohash (`geofire-common`) | Radius-bounded pharmacy/inventory queries without a separate spatial database. |
 | **File Storage** | Cloud Storage for Firebase | Uploaded prescription photos, pill/label scans, generated PDF reports. |
 | **Scheduling & Queueing** | Cloud Scheduler + Cloud Tasks | Reminder cron triggers, background job dispatch (replaces self-hosted Redis/BullMQ). |
-| **Notification Pipeline** | Firebase Cloud Messaging (FCM) | Push notifications; sole delivery channel, no third-party SMS gateway. |
+| **Notification Pipeline** | Firebase Cloud Messaging (FCM) for Web (Web Push) | Push notifications via the browser; sole delivery channel, no third-party SMS gateway. |
 | **Auth** | Firebase Authentication | JWT-based auth, custom claims for patient/pharmacy/clinician roles. |
 | **Analytics** | Firebase Analytics + BigQuery export | Adherence metrics, demo impact dashboards. |
-| **Maps** | Google Maps Platform (`google_maps_flutter`, Directions API) | Interactive map, distance/route rendering. |
+| **Maps** | Google Maps Platform (`@react-google-maps/api`, Directions API) | Interactive map, distance/route rendering. |
 
 ---
 
