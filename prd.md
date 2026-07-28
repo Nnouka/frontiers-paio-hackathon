@@ -21,7 +21,7 @@ what was actually purchased) leaves the loop open.
 
 ### Why now
 - Real-time pharmacy inventory and geolocation are now practical to query cheaply (Firestore + geohash)
-- Multimodal GenAI (Vertex AI Gemini) makes reliable OCR + entity extraction from a phone photo feasible in a 12-hour build
+- Multimodal GenAI (Gemini API via Google AI Studio) makes reliable OCR + entity extraction from a phone photo feasible in a 12-hour build
 - Firebase's managed stack (Auth, Firestore, Functions, FCM, Hosting) lets a 5-person team ship a full closed loop without standing up separate infrastructure
 - Clear hackathon constraints favor one focused, demoable workflow over broad feature breadth
 
@@ -209,7 +209,7 @@ third-party backend services). Full detail in [system.md](system.md) and
 - Frontend: React + TypeScript (Vite), mobile-first responsive web app — no native app, works in any modern mobile or desktop browser
 - Backend: Firebase Cloud Functions (Node.js/TypeScript, 2nd gen)
 - Data: Firestore for pharmacies, inventory, medications, and adherence logs; Cloud Storage for uploaded scans and generated PDFs
-- GenAI: Vertex AI Gemini API for OCR extraction, DDI reasoning, and NL schedule parsing
+- GenAI: Gemini API (Google AI Studio) for OCR extraction, DDI reasoning, and NL schedule parsing
 - Web services: Firebase Auth, Firebase Cloud Messaging (FCM Web Push) as the sole notification channel, and Firestore offline persistence (IndexedDB) for offline continuity
 
 ### Interoperability options (if enabled)
@@ -251,7 +251,7 @@ Mitigation: show a "last updated" timestamp on every result; treat hold expiry a
 ### Risk: Unsafe or misleading DDI guidance
 Mitigation: strict Severe/Moderate/Dietary thresholds, mandatory human confirmation on Severe, explicit physician-consultation disclaimer
 
-### Risk: Model or API availability constraints (Vertex AI Gemini)
+### Risk: Model or API availability constraints (Gemini API via Google AI Studio)
 Mitigation: fallback to synthetic test fixtures for scan/extract and DDI demo paths
 
 ### Risk: High false confidence in medication extraction

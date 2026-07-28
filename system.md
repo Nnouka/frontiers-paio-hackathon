@@ -31,7 +31,7 @@ By seamlessly bridging real-time geo-spatial inventory matching with an intellig
 |                                                                                                   |
 |  +------------------------+  +--------------------------+  +-----------------------------------+  |
 |  | Geo-Spatial Engine     |  | AI Vision & OCR Service  |  | Drug Safety Engine (DDI)          |  |
-|  | (Firestore + geohash)  |  | (Vertex AI Gemini API)   |  | (Cloud Functions + Gemini)         |  |
+|  | (Firestore + geohash)  |  | (Gemini API, Google AI Studio)   |  | (Cloud Functions + Gemini)         |  |
 |  +-----------+------------+  +------------+-------------+  +-----------------+-----------------+  |
 |              |                            |                              |                        |
 |              +----------------------------+------------------------------+                        |
@@ -86,7 +86,7 @@ v                                     v
    * Following purchase, the patient captures the pill box, bottle label, or official receipt using the device camera via the browser's `getUserMedia`/file-input capture API (works on mobile and desktop browsers, no native app install required).
 
 2. **Multimodal AI Vision Extraction Pipeline:**
-   * The image is uploaded to Cloud Storage for Firebase, then processed by a Cloud Function that calls the **Vertex AI Gemini API** (multimodal) for OCR and entity extraction.
+   * The image is uploaded to Cloud Storage for Firebase, then processed by a Cloud Function that calls the **Gemini API** (Google AI Studio, multimodal) for OCR and entity extraction.
    * **Extracted Entities:**
      * `drug_name`: Brand and generic name.
      * `dosage_strength`: e.g., 500 mg, 10 ml.
@@ -140,7 +140,7 @@ v                                     v
 | **Frontend / Web App** | React + TypeScript (Vite), mobile-first responsive design | Single responsive web app (patient + pharmacy portal), offline-first caching (Firestore offline persistence), browser camera capture, Web Push background alerts. No native app install required. |
 | **Pharmacy Portal** | Same React + TypeScript codebase, role-gated routes | Pharmacy-side inventory management UI, served from the same web app via Firebase Hosting. |
 | **Backend / API** | Firebase Cloud Functions (Node.js/TypeScript, 2nd gen) | Callable/HTTPS functions, Firestore/Storage triggers, user authentication guard, business logic. |
-| **AI / Machine Learning Engine** | Vertex AI Gemini API (multimodal) | Vision OCR entity extraction, drug-drug interaction reasoning, natural language schedule parsing. |
+| **AI / Machine Learning Engine** | Gemini API (Google AI Studio, multimodal) | Vision OCR entity extraction, drug-drug interaction reasoning, natural language schedule parsing. |
 | **Database Layer** | Cloud Firestore | Document storage for users, pharmacies, inventory (with geohash field), prescriptions, medications, adherence logs. |
 | **Geospatial Indexing** | Firestore + geohash (`geofire-common`) | Radius-bounded pharmacy/inventory queries without a separate spatial database. |
 | **File Storage** | Cloud Storage for Firebase | Uploaded prescription photos, pill/label scans, generated PDF reports. |

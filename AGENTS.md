@@ -28,7 +28,7 @@ Chosen for hackathon speed and prototyping fit. Do not introduce non-Google back
 - **Backend:** Firebase Cloud Functions (Node.js/TypeScript, 2nd gen)
 - **Database:** Cloud Firestore (see system.md section 4 for the collection layout)
 - **File storage:** Cloud Storage for Firebase
-- **AI/ML:** Vertex AI Gemini API (multimodal OCR, entity extraction, NL reasoning)
+- **AI/ML:** Gemini API (Google AI Studio, multimodal OCR, entity extraction, NL reasoning)
 - **Notifications:** Firebase Cloud Messaging (FCM) Web Push — sole channel, no Twilio/SMS gateway
 - **Scheduling/queueing:** Cloud Scheduler + Cloud Tasks — no Redis/BullMQ
 - **Auth:** Firebase Authentication with custom claims (patient/pharmacy/clinician roles)

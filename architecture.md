@@ -26,7 +26,7 @@ PATIENT WEB APP (React + TypeScript, mobile-first)
        v  Firebase SDKs / Callable Functions
 FIREBASE / GOOGLE CLOUD BACKEND
   - Geo-Spatial Engine (Firestore + geohash)
-  - AI Vision & OCR Service (Vertex AI Gemini API)
+  - AI Vision & OCR Service (Gemini API, Google AI Studio)
   - Drug Safety Engine / DDI (Cloud Functions + Gemini)
        -> Schedule & Alert Service (Cloud Scheduler / Cloud Tasks + FCM)
        |
@@ -42,7 +42,7 @@ FIREBASE / GOOGLE CLOUD BACKEND
 | Pharmacy Portal | Pharmacy-side inventory management UI | Same React + TypeScript app, role-gated routes, Firebase Hosting |
 | Backend / API | Auth guard, routing, business logic | Firebase Cloud Functions (Node.js/TypeScript, 2nd gen) |
 | Geo-Spatial Engine | Radius search, SKU/generic matching, hold requests | Firestore + geohash (`geofire-common`) |
-| AI Vision & OCR Service | Prescription/label/receipt parsing into structured entities | Vertex AI Gemini API (multimodal) |
+| AI Vision & OCR Service | Prescription/label/receipt parsing into structured entities | Gemini API (Google AI Studio, multimodal) |
 | Drug Safety Engine (DDI) | Cross-reference active medication profile, severity thresholds | Cloud Functions + Gemini reasoning |
 | Schedule & Alert Service | NL instruction -> timestamp schedule, notification dispatch | Cloud Scheduler + Cloud Tasks + FCM (Web Push) |
 | Data & Analytics Storage | Persistence, adherence analytics, PDF export | Firestore, Cloud Storage, BigQuery |
@@ -52,7 +52,7 @@ FIREBASE / GOOGLE CLOUD BACKEND
 ## 3) Data Flow (four phases, see system.md for full detail)
 
 1. **Search & stock verification** — query text/photo + GPS -> Firestore geohash range query -> map results with distance/price/stock -> optional 60-min hold (TTL document, expired by scheduled Cloud Function).
-2. **Purchase onboarding & OCR** — scan pill box/label/receipt -> Cloud Storage upload -> Vertex AI Gemini extraction (drug_name, dosage_strength, form, dosage_instruction, duration_days, total_quantity, warnings) -> DDI screening against active medication profile (severe / moderate / dietary alerts).
+2. **Purchase onboarding & OCR** — scan pill box/label/receipt -> Cloud Storage upload -> Gemini API (Google AI Studio) extraction (drug_name, dosage_strength, form, dosage_instruction, duration_days, total_quantity, warnings) -> DDI screening against active medication profile (severe / moderate / dietary alerts).
 3. **Schedule generation & alerts** — NL instructions -> Gemini-parsed timestamped schedule against lifestyle anchors -> Cloud Scheduler/Tasks fire FCM push; unconfirmed after 15 min -> in-app fallback flag (no third-party SMS gateway).
 4. **Adherence logging & predictive refills** — one-tap Take/Snooze/Skip writes an `adherence_logs` doc and decrements remaining count -> Firestore-triggered Cloud Function raises refill alert under 3-day threshold, kicking off a pharmacy search -> adherence analytics (BigQuery) + PDF export (Cloud Function, stored in Cloud Storage) for clinicians.
 
@@ -67,7 +67,7 @@ first, then here.
 
 - **Cloud Firestore** — primary database, real-time sync, offline persistence
 - **Cloud Storage for Firebase** — prescription photos, scans, generated PDFs
-- **Vertex AI Gemini API** — multimodal OCR + entity extraction + NL reasoning (DDI, scheduling)
+- **Gemini API (Google AI Studio)** — multimodal OCR + entity extraction + NL reasoning (DDI, scheduling)
 - **Firebase Cloud Messaging (FCM)** — sole notification channel
 - **Cloud Scheduler + Cloud Tasks** — cron-driven and queued background jobs
 - **Firebase Authentication** — patient/pharmacy/clinician roles via custom claims
@@ -86,7 +86,7 @@ not renegotiating.
 | :--- | :--- | :--- | :--- |
 | 1 | **Web Frontend App** | React + TypeScript patient web app: search, map, camera capture, reminder UI, adherence logging UI, offline cache | Consumes callable functions below via a typed TypeScript client; mocked responses until integration |
 | 2 | **Geo-Spatial & Pharmacy Portal** | Firestore geohash search, `pharmacies`/`inventory` collections, hold requests, React + TypeScript pharmacy portal routes | `searchPharmacies` callable, `createHold` callable |
-| 3 | **AI Vision/OCR & Drug Safety** | Vertex AI Gemini extraction pipeline, DDI/contraindication logic, alert thresholds | `extractFromScan` callable, `checkDDI` callable |
+| 3 | **AI Vision/OCR & Drug Safety** | Gemini API (Google AI Studio) extraction pipeline, DDI/contraindication logic, alert thresholds | `extractFromScan` callable, `checkDDI` callable |
 | 4 | **Schedule & Alert Service** | NL-to-schedule parsing (Gemini), Cloud Scheduler/Tasks + FCM dispatch, snooze/escalation logic | `createSchedule` callable; scheduler-triggered function (no direct contract) |
 | 5 | **Data, Auth & Analytics** | Firebase Auth/custom claims, `users/{id}/medications` + `adherence_logs` persistence, BigQuery export, PDF export, CI/consolidation | `logMedication` callable, `logAdherence` callable, `getAdherenceAnalytics` callable |
 

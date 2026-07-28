@@ -34,9 +34,9 @@ contracts at the end. System behavior detail is in [system.md](system.md).
 
 ## [ ] Epic 3: AI Vision/OCR & Drug Safety Engine (Workstream 3)
 
-- [ ] As a system, I can extract structured entities from a scanned pill box, label, or receipt via Vertex AI Gemini: drug_name, dosage_strength, form, dosage_instruction, duration_days, total_quantity, warnings.
-- [ ] As a system, I can parse a photographed doctor's prescription into a structured medication query for search.
-- [ ] As a system, I can cross-reference a newly scanned drug against a patient's active medication profile for interactions.
+- [ ] As a system, I can extract structured entities from a scanned pill box, label, or receipt via Gemini API (Google AI Studio): drug_name, dosage_strength, form, dosage_instruction, duration_days, total_quantity, warnings.
+- [x] As a system, I can parse a photographed doctor's prescription into a structured medication query for search.
+- [x] As a system, I can cross-reference a newly scanned drug against a patient's active medication profile for interactions.
 - [ ] As a system, I can classify an interaction as Severe (dangerous, requires explicit confirmation + physician warning), Moderate (overlapping active ingredients), or Dietary (food/beverage contraindication).
 - [ ] As a patient, I must explicitly confirm before proceeding when a Severe alert is raised.
 - [ ] As a system, I expose `extractFromScan` and `checkDDI` Cloud Functions callables per the agreed contract.

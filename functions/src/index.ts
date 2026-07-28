@@ -1,46 +1,36 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
-import { MOCK_PHARMACIES, MOCK_DDI_RULES } from "./services/mockData";
+import {
+  queryNearbyPharmacies,
+  createHoldTransaction,
+  expireDueHolds,
+  DuplicateHoldError,
+  InsufficientStockError,
+  InventoryNotFoundError,
+} from "./services/pharmacyRepository";
+import { extractMedicationFromImage } from "./services/geminiService";
+import { checkDeterministicDDI, DEMO_FALLBACK_MEDICATIONS } from "./services/ddiRules";
+import { getActiveMedicationsForUser, type ActiveMedicationRef } from "./services/medicationRepository";
 
 /**
  * 1. searchPharmacies (Workstream 2)
  */
 export const searchPharmacies = onCall({ cors: true }, async (request) => {
   const { query, latitude, longitude, radiusKm = 10 } = request.data || {};
-  
+
   if (typeof latitude !== "number" || typeof longitude !== "number") {
     throw new HttpsError("invalid-argument", "latitude and longitude are required numbers.");
   }
 
   logger.info("searchPharmacies call received", { query, latitude, longitude, radiusKm });
 
-  const searchLower = (query || "").toLowerCase();
-  
-  const results = MOCK_PHARMACIES.map((pharmacy) => {
-    // Simple Euclidean approximation for mock distance
-    const latDiff = pharmacy.latitude - latitude;
-    const lonDiff = pharmacy.longitude - longitude;
-    const distanceKm = Math.round(Math.sqrt(latDiff * latDiff + lonDiff * lonDiff) * 111 * 10) / 10;
-
-    const matchingInventory = pharmacy.inventory.filter((inv) => {
-      if (!query) return true;
-      return (
-        inv.medication_name.toLowerCase().includes(searchLower) ||
-        inv.generic_name.toLowerCase().includes(searchLower)
-      );
-    });
-
-    return {
-      ...pharmacy,
-      distanceKm,
-      matchingInventory,
-    };
-  }).filter((p) => p.distanceKm <= radiusKm && p.matchingInventory.length > 0);
+  const pharmacies = await queryNearbyPharmacies(latitude, longitude, radiusKm, query || "");
 
   return {
-    pharmacies: results,
+    pharmacies,
     searchRadiusKm: radiusKm,
-    totalFound: results.length,
+    totalFound: pharmacies.length,
   };
 });
 
@@ -54,60 +44,59 @@ export const createHold = onCall({ cors: true }, async (request) => {
     throw new HttpsError("invalid-argument", "pharmacyId and inventoryId are required.");
   }
 
-  const pharmacy = MOCK_PHARMACIES.find((p) => p.id === pharmacyId);
-  const inventory = pharmacy?.inventory.find((i) => i.id === inventoryId);
-
-  if (!inventory) {
-    throw new HttpsError("not-found", "Requested inventory item was not found.");
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError("unauthenticated", "You must be signed in to place a hold.");
   }
 
-  const holdId = `hold-${Date.now()}`;
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 60 minutes TTL
+  try {
+    const hold = await createHoldTransaction({ userId, pharmacyId, inventoryId, quantity });
+    logger.info("createHold reservation created", { holdId: hold.id, pharmacyId, inventoryId, userId });
 
-  logger.info("createHold reservation created", { holdId, pharmacyId, inventoryId });
-
-  return {
-    hold: {
-      holdId,
-      pharmacyId,
-      inventoryId,
-      medicationName: inventory.medication_name,
-      quantity,
-      expiresAt,
-      status: "ACTIVE",
-    },
-  };
+    return {
+      hold: {
+        holdId: hold.id,
+        pharmacyId: hold.pharmacyId,
+        inventoryId: hold.inventoryId,
+        medicationName: hold.medicationName,
+        quantity: hold.quantity,
+        expiresAt: hold.expiresAt,
+        status: hold.status,
+      },
+    };
+  } catch (err) {
+    if (err instanceof DuplicateHoldError) {
+      throw new HttpsError("already-exists", err.message);
+    }
+    if (err instanceof InsufficientStockError) {
+      throw new HttpsError("failed-precondition", err.message);
+    }
+    if (err instanceof InventoryNotFoundError) {
+      throw new HttpsError("not-found", err.message);
+    }
+    throw err;
+  }
 });
 
 /**
- * 3. extractFromScan (Workstream 3)
+ * 3. extractFromScan (Workstream 3 - AI Vision / OCR Engine)
  */
 export const extractFromScan = onCall({ cors: true }, async (request) => {
-  const { scanType = "PRESCRIPTION" } = request.data || {};
+  const { imageBase64, scanType = "PRESCRIPTION" } = request.data || {};
 
-  logger.info("extractFromScan processing", { scanType });
+  logger.info("extractFromScan processing", { scanType, hasImage: !!imageBase64 });
 
-  // Baseline structured entity payload
-  return {
-    extracted: {
-      drug_name: "Amoxicillin 500mg",
-      generic_name: "Amoxicillin",
-      dosage_strength: "500 mg",
-      form: "Capsule",
-      dosage_instruction: "1 capsule 3 times daily after meals",
-      duration_days: 7,
-      total_quantity: 21,
-      warnings: [
-        "Take on a full stomach with plenty of water",
-        "Complete the full course as prescribed"
-      ],
-      rawTextConfidence: 0.96
-    }
-  };
+  const extracted = await extractMedicationFromImage(
+    imageBase64 || "",
+    "image/jpeg",
+    scanType
+  );
+
+  return { extracted };
 });
 
 /**
- * 4. checkDDI (Workstream 3)
+ * 4. checkDDI (Workstream 3 - Drug Safety / Interaction Engine)
  */
 export const checkDDI = onCall({ cors: true }, async (request) => {
   const { newMedication } = request.data || {};
@@ -116,39 +105,49 @@ export const checkDDI = onCall({ cors: true }, async (request) => {
     throw new HttpsError("invalid-argument", "newMedication.drug_name is required.");
   }
 
-  const drugNameLower = newMedication.drug_name.toLowerCase();
-  logger.info("checkDDI screening", { drugNameLower });
+  const newDrugName = newMedication.drug_name;
+  const callerUid = request.auth?.uid;
+  logger.info("checkDDI screening", { newDrugName, callerUid: callerUid ?? "anonymous" });
+
+  // Only ever read the caller's own subcollection — request.data must never
+  // supply a target userId here. CheckDDIRequest.patientId stays reserved
+  // and unused until a clinician/admin auth-check design exists.
+  let activeMedications: ActiveMedicationRef[] = callerUid
+    ? await getActiveMedicationsForUser(callerUid)
+    : [];
+
+  if (activeMedications.length === 0) {
+    activeMedications = DEMO_FALLBACK_MEDICATIONS;
+  }
 
   const interactions = [];
-  let overallRiskLevel: "NONE" | "LOW" | "MODERATE" | "SEVERE" = "NONE";
+  let highestSeverity: "NONE" | "LOW" | "MODERATE" | "SEVERE" = "NONE";
 
-  if (drugNameLower.includes("aspirin")) {
-    const rule = MOCK_DDI_RULES["aspirin_warfarin"];
-    interactions.push({
-      existingDrugName: rule.existing,
-      newDrugName: newMedication.drug_name,
-      severity: rule.severity,
-      description: rule.description,
-      recommendation: rule.recommendation,
-      requiresConfirmation: true
-    });
-    overallRiskLevel = "SEVERE";
-  } else if (drugNameLower.includes("amoxicillin")) {
-    const rule = MOCK_DDI_RULES["amoxicillin_methotrexate"];
-    interactions.push({
-      existingDrugName: rule.existing,
-      newDrugName: newMedication.drug_name,
-      severity: rule.severity,
-      description: rule.description,
-      recommendation: rule.recommendation,
-      requiresConfirmation: false
-    });
-    overallRiskLevel = "MODERATE";
+  for (const activeMed of activeMedications) {
+    const match = checkDeterministicDDI(newDrugName, activeMed.drug_name);
+    if (match) {
+      interactions.push({
+        existingDrugName: activeMed.drug_name,
+        newDrugName,
+        severity: match.severity,
+        description: match.description,
+        recommendation: match.recommendation,
+        requiresConfirmation: match.requiresConfirmation
+      });
+
+      if (match.severity === "SEVERE") {
+        highestSeverity = "SEVERE";
+      } else if (match.severity === "MODERATE" && highestSeverity !== "SEVERE") {
+        highestSeverity = "MODERATE";
+      } else if (match.severity === "DIETARY" && highestSeverity === "NONE") {
+        highestSeverity = "LOW";
+      }
+    }
   }
 
   return {
     interactions,
-    overallRiskLevel
+    overallRiskLevel: highestSeverity
   };
 });
 
@@ -230,11 +229,9 @@ export const logAdherence = onCall({ cors: true }, async (request) => {
 
   const logId = `log-${Date.now()}`;
   const nowStr = new Date().toISOString();
-  
-  // Mock remaining calculation
-  const currentRemaining = 4; // Mock near threshold
+  const currentRemaining = 4;
   const newRemaining = action === "TAKEN" ? Math.max(0, currentRemaining - 1) : currentRemaining;
-  const refillAlertTriggered = newRemaining <= 3; // 3-day threshold rule
+  const refillAlertTriggered = newRemaining <= 3;
 
   return {
     log: {
@@ -288,4 +285,12 @@ export const getAdherenceAnalytics = onCall({ cors: true }, async (request) => {
       pdfReportUrl: "https://storage.googleapis.com/frontiers-paio-dev/reports/adherence_summary.pdf"
     }
   };
+});
+
+/**
+ * 9. expireHolds (Workstream 2) - releases stock from holds past their 60-minute window
+ */
+export const expireHolds = onSchedule("every 2 minutes", async () => {
+  const expiredCount = await expireDueHolds();
+  logger.info("expireHolds run complete", { expiredCount });
 });

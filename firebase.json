@@ -1,6 +1,7 @@
 {
   "hosting": {
     "public": "dist",
+    "site": "pharmaloop",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -12,6 +13,7 @@
         "destination": "/index.html"
       }
     ]
+    
   },
   "functions": [
     {

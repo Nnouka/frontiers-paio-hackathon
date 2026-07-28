@@ -86,6 +86,6 @@ A feature is done when:
 - We do not ship an adherence loop without the DDI safety check on newly scanned medication
 - **Google/Firebase services only.** Frontend is a mobile-first responsive web app (React +
   TypeScript, no native app); backend is Firebase Cloud Functions, Firestore, Cloud Storage, FCM
-  (Web Push), Cloud Scheduler/Tasks, and Vertex AI Gemini. No third-party backend services (no
+  (Web Push), Cloud Scheduler/Tasks, and Gemini API (Google AI Studio). No third-party backend services (no
   Express server, no standalone Postgres/Redis, no Twilio/SMS gateway) — chosen for one-console
   setup speed and prototyping fit within the hackathon window.

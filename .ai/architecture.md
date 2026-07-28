@@ -19,9 +19,9 @@ schedule generation & alerts, (4) adherence logging & predictive refills. See ar
 section 3.
 
 **External dependencies / integrations:**
-Firestore + geohash, Cloud Scheduler + Cloud Tasks, Firebase Cloud Messaging (Web Push), Vertex AI
-Gemini API, Google Maps Platform. Google/Firebase services only — no PostGIS, Redis/BullMQ, or
-Twilio. See architecture.md section 5.
+Firestore + geohash, Cloud Scheduler + Cloud Tasks, Firebase Cloud Messaging (Web Push), the
+Gemini API (Google AI Studio), Google Maps Platform. Google/Firebase services only — no PostGIS,
+Redis/BullMQ, or Twilio. See architecture.md section 5.
 
 **Team ownership:**
 5 parallel workstreams mapped in architecture.md section 6, each owning a Cloud Functions callable

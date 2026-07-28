@@ -4,7 +4,7 @@ This document lists practical APIs and datasets for a 12-hour health-track MVP a
 
 ## 1) Recommended APIs and platforms
 
-### 1. Vertex AI Gemini API
+### 1. Gemini API (Google AI Studio)
 - What it is: Google's multimodal GenAI API for text and image understanding/generation.
 - How it helps: Converts complex clinical language into plain-language patient and caregiver guidance, supports translation, and structured action plans.
 
