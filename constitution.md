@@ -42,6 +42,7 @@ Finding the medication is the entry point; completing the treatment is the value
 - Every feature includes acceptance criteria and a demo path
 - All user-facing flows include empty/loading/error states, including "no stock nearby" and "OCR extraction failed"
 - Severe/moderate/dietary DDI alerts always show their threshold level and required next action
+- **Datastore Security & Index Synchronization:** Firestore security rules (`firestore.rules`), storage rules (`storage.rules`), and composite indexes (`firestore.indexes.json`) must be updated and kept in 100% sync whenever code changes modify database collections, security patterns, or compound queries.
 
 ### Safety and ethics
 - No autonomous diagnosis or prescription-substitution decisions
@@ -72,6 +73,7 @@ A feature is done when:
 - Acceptance criteria pass
 - The target flow (search, scan, schedule, or adherence log) is verified at mobile breakpoints first, then desktop
 - Safety and failure states are implemented (no stock, extraction failure, severe DDI alert, offline)
+- `firestore.rules`, `storage.rules`, and `firestore.indexes.json` are updated and cover all query/data access patterns
 - The feature's API contract with other workstreams is unchanged or the change was communicated
 - One teammate validates in preview
 

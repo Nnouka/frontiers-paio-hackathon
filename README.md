@@ -101,14 +101,25 @@ All 5 workstreams integrate against 8 typed Cloud Functions callable contracts d
 │   ├── services/firebase.ts # Firebase SDK & auto-emulator connector
 │   ├── App.tsx              # Main shell (Patient App, Pharmacy Portal, Contracts Console)
 │   └── index.css            # Glassmorphism design system & CSS tokens
-├── firebase.json            # Firebase Hosting, Functions, & Emulators config
+├── firebase.json            # Firebase Hosting, Functions, Firestore & Emulators config
 ├── firestore.rules          # Firestore least-privilege security rules
+├── firestore.indexes.json   # Firestore composite index declarations (kept in sync with queries)
 ├── storage.rules            # Cloud Storage security rules
 ├── system.md                # System Architecture & Operational Blueprint (Source of Truth)
 ├── architecture.md          # Team Ownership & Module Breakdown
 ├── userstories.md           # Workstream Epics & Acceptance Criteria
 └── README.md                # Developer onboarding & continuation guide
 ```
+
+---
+
+## 🔒 Datastore Rules & Indexes Synchronization
+
+> [!IMPORTANT]
+> Whenever code updates add, modify, or query Cloud Firestore collections or Cloud Storage paths (e.g. compound range queries, subcollections, or access pattern changes), developers and AI agents **MUST** immediately update:
+> - [`firestore.rules`](firestore.rules)
+> - [`storage.rules`](storage.rules)
+> - [`firestore.indexes.json`](firestore.indexes.json)
 
 ---
 

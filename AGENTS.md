@@ -61,6 +61,7 @@ Follow [constitution.md](constitution.md) in full. Key points an agent must not 
 
 - Brainstorm and produce a written spec/plan before implementation on non-trivial work; get
   explicit approval before coding.
+- **Datastore Rule & Index Synchronization (Mandatory):** Whenever code updates touch Cloud Firestore or Cloud Storage (e.g. new collections, modified schemas, compound queries, range filters, or subcollections), you MUST immediately update [`firestore.rules`](firestore.rules), [`storage.rules`](storage.rules), and [`firestore.indexes.json`](firestore.indexes.json) to reflect the new access patterns and query index requirements. Never leave security rules or index files out of date.
 - Every feature needs acceptance criteria, a demo path, and empty/loading/error states.
 - Severe drug-interaction (DDI) findings always require explicit patient confirmation and a
   physician-consultation warning — never resolve them silently.
@@ -70,7 +71,8 @@ Follow [constitution.md](constitution.md) in full. Key points an agent must not 
 
 ## Verification
 
-Before marking work done: run against the Firebase Emulator Suite where possible, check the flow
-at mobile viewport widths first, confirm Firestore Security Rules cover the new access pattern,
-and confirm the feature's callable-function contract with other workstreams is unchanged (or the
-change was communicated).
+Before marking work done:
+1. Run against the Firebase Emulator Suite where possible.
+2. Check the flow at mobile viewport widths first.
+3. Confirm [`firestore.rules`](firestore.rules), [`storage.rules`](storage.rules), and [`firestore.indexes.json`](firestore.indexes.json) cover any new access patterns, collections, or compound queries introduced by code changes.
+4. Confirm the feature's callable-function contract with other workstreams is unchanged (or the change was communicated).
