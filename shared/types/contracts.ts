@@ -30,6 +30,7 @@ export interface Pharmacy {
   location: GeoLocation;
   geohash: string;
   phone: string;
+  hours?: string;
   is_active: boolean;
   inventory?: InventoryItem[];
 }
