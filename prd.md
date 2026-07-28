@@ -81,7 +81,7 @@ In many African contexts, care quality drops after discharge: patients often sto
 ## 5) Product Requirements
 
 ### Functional requirements
-1. User can submit health instruction text through a mobile app UI (React Native).
+1. User can submit health instruction text through a mobile app UI (Flutter).
 2. System generates plain-language explanation with structured sections:
    - what this means
    - what to do now
@@ -205,12 +205,16 @@ Calm, clear, and trustworthy. The product must feel clinically respectful but ac
 
 ## 9) Architecture and Delivery Plan
 
+**Stack constraint: Google/Firebase services only** (hackathon speed + prototyping fit — no
+third-party backend services). Full detail in [health/system.md](system.md) and
+[health/architecture.md](architecture.md).
+
 ### Core architecture
-- Frontend: React Native + TypeScript (Expo), Android-first with iOS support
-- Backend: Firebase Cloud Functions (TypeScript) with optional Python path for NLP-heavy processing
-- Data: Firestore for sessions and feedback, Firebase Storage for uploaded artifacts
-- GenAI: Gemini-based generation and transformation workflows
-- Mobile services: Firebase Auth, Firebase Cloud Messaging (FCM), and secure local cache for offline continuity
+- Frontend: Flutter (Dart), Android-first with iOS support
+- Backend: Firebase Cloud Functions (Node.js/TypeScript, 2nd gen)
+- Data: Firestore for sessions, medications, and adherence logs; Cloud Storage for uploaded artifacts and generated PDFs
+- GenAI: Vertex AI Gemini API for generation, OCR extraction, and transformation workflows
+- Mobile services: Firebase Auth, Firebase Cloud Messaging (FCM) as the sole notification channel, and Firestore offline persistence for offline continuity
 
 ### Interoperability options (if enabled)
 - Cloud Healthcare API FHIR stores
@@ -218,10 +222,10 @@ Calm, clear, and trustworthy. The product must feel clinically respectful but ac
 - Cloud Healthcare API DICOM stores
 
 ### Deployment
-- Expo EAS Build/Submit for APK/TestFlight distribution
+- Firebase App Distribution for APK/TestFlight-equivalent build distribution
 - Cloud Functions for API runtime
 - Firebase Auth for user and reviewer roles
-- GitHub Actions for CI and preview deployments
+- GitHub Actions for CI and Firebase Hosting preview channels for preview deployments
 
 ## 10) Release Plan (Hackathon)
 

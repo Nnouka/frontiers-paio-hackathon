@@ -86,7 +86,7 @@ This document lists practical APIs and datasets for a 12-hour health-track MVP a
 ## 5) Fast implementation order
 
 ### Hour 1-2
-- Setup Firebase project, auth, base React Native (Expo) app, and functions scaffold.
+- Setup Firebase project, auth, base Flutter app, and Cloud Functions scaffold.
 
 ### Hour 3-5
 - Build upload flow, Gemini explanation endpoint, and medication-plan extraction.
